@@ -5,7 +5,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
+
+type Dialer func(network, address string) (net.Conn, error)
 
 type Client struct {
 	//
@@ -15,12 +18,14 @@ type Client struct {
 	Handlers     map[string]Handler
 	conn         net.Conn
 	protocol     MessageProtocol
+	dial         Dialer
 }
 
 func NewClient(protocol MessageProtocol) *Client {
 	return &Client{
 		Handlers: make(map[string]Handler),
 		protocol: protocol,
+		dial:     net.Dial,
 	}
 }
 
@@ -43,7 +48,7 @@ func (s *Client) Start(host, port string) error {
 		}
 	}
 
-	c, err := net.Dial("tcp", net.JoinHostPort(host, port))
+	c, err := s.dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
 		return &ConnError{Err: err} //errors.New("failed to connect to server: " + err.Error())
 	}
@@ -100,4 +105,12 @@ func (s *Client) StartWithRetry(host, port string, retries int) error {
 
 func (c *Client) SendMessage(msg Message) {
 	c.messageChan <- msg
+}
+
+func (c *Client) RegisterHandler(command string, handler Handler) {
+	c.Handlers[strings.ToLower(command)] = handler
+}
+
+func (c *Client) Close() error {
+	return nil
 }
